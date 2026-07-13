@@ -1,0 +1,118 @@
+import 'package:fin_khata/core/database/app_database.dart';
+import 'package:fin_khata/features/finance/data/drift_finance_repository.dart';
+import 'package:fin_khata/features/finance/domain/finance_models.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  late AppDatabase database;
+  late DriftFinanceRepository repository;
+
+  setUp(() async {
+    database = AppDatabase.memory();
+    repository = DriftFinanceRepository(database);
+    await repository.initialize();
+    await repository.saveWorkspace(
+      const Workspace(
+        id: 'workspace',
+        name: 'Personal',
+        type: WorkspaceType.personal,
+      ),
+    );
+    await repository.saveAccount(
+      const Account(
+        id: 'cash',
+        workspaceId: 'workspace',
+        name: 'Cash',
+        type: 'cash',
+        openingBalance: 1000,
+        currentBalance: 1000,
+      ),
+    );
+    await repository.saveAccount(
+      const Account(
+        id: 'bank',
+        workspaceId: 'workspace',
+        name: 'Bank',
+        type: 'bank',
+        openingBalance: 0,
+        currentBalance: 0,
+      ),
+    );
+  });
+
+  tearDown(() => repository.close());
+
+  test('income increases and expense decreases account balance', () async {
+    await repository.postTransaction(
+      FinanceTransaction(
+        id: 'income',
+        workspaceId: 'workspace',
+        accountId: 'cash',
+        type: TransactionType.income,
+        amount: 500,
+        date: DateTime(2026, 7, 13),
+      ),
+    );
+    await repository.postTransaction(
+      FinanceTransaction(
+        id: 'expense',
+        workspaceId: 'workspace',
+        accountId: 'cash',
+        type: TransactionType.expense,
+        amount: 200,
+        date: DateTime(2026, 7, 13),
+      ),
+    );
+
+    final accounts = await repository.accounts('workspace');
+    expect(
+      accounts.firstWhere((item) => item.id == 'cash').currentBalance,
+      1300,
+    );
+  });
+
+  test('transfer updates both accounts atomically', () async {
+    await repository.postTransaction(
+      FinanceTransaction(
+        id: 'transfer',
+        workspaceId: 'workspace',
+        accountId: 'cash',
+        destinationAccountId: 'bank',
+        type: TransactionType.transfer,
+        amount: 250,
+        date: DateTime(2026, 7, 13),
+      ),
+    );
+
+    final accounts = await repository.accounts('workspace');
+    expect(
+      accounts.firstWhere((item) => item.id == 'cash').currentBalance,
+      750,
+    );
+    expect(
+      accounts.firstWhere((item) => item.id == 'bank').currentBalance,
+      250,
+    );
+  });
+
+  test('same-account and non-positive transactions are rejected', () async {
+    expect(
+      () => repository.postTransaction(
+        FinanceTransaction(
+          id: 'invalid',
+          workspaceId: 'workspace',
+          accountId: 'cash',
+          destinationAccountId: 'cash',
+          type: TransactionType.transfer,
+          amount: 10,
+          date: DateTime(2026, 7, 13),
+        ),
+      ),
+      throwsA(isA<FinanceValidationException>()),
+    );
+    expect(
+      () => validatePositiveAmount(0),
+      throwsA(isA<FinanceValidationException>()),
+    );
+  });
+}

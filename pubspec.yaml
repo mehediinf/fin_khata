@@ -1,0 +1,54 @@
+name: fin_khata
+description: "FinKhata - personal and small business finance manager."
+
+publish_to: 'none' 
+
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.2
+
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  crypto: ^3.0.7
+  drift: ^2.31.0
+  fl_chart: ^1.1.1
+  flutter_riverpod: ^3.3.2
+  flutter_secure_storage: ^10.3.1
+  go_router: ^17.3.0
+  intl: ^0.20.2
+  local_auth: ^3.0.0
+  path: ^1.9.1
+  path_provider: ^2.1.5
+  uuid: ^4.5.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/images/app_logo.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/images/app_logo.png"
+
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/app_logo.png
+
+
+
