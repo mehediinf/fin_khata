@@ -136,6 +136,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
                         initialValue: _currency,
+                        isExpanded: true,
                         decoration: InputDecoration(
                           labelText: t('Currency', 'মুদ্রা'),
                         ),
@@ -145,6 +146,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                                 value: currency.code,
                                 child: Text(
                                   '${currency.symbol}  ${currency.code} — ${currency.name}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             )

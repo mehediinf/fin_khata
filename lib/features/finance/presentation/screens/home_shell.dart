@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/constants/app_currencies.dart';
 import '../../../../core/localization/app_strings.dart';
 import '../../../onboarding/presentation/onboarding_screen.dart';
+import '../../../premium/domain/premium_analytics.dart';
 import '../../domain/finance_models.dart';
 import '../providers/finance_controller.dart';
 
@@ -265,6 +266,8 @@ class DashboardPage extends ConsumerWidget {
           ),
           const SizedBox(height: 10),
           _QuickActions(state: state),
+          const SizedBox(height: 16),
+          _DashboardPremiumBanner(state: state),
           if (!state.isBusiness) ...[
             const SizedBox(height: 22),
             _BudgetOverview(state: state),
@@ -681,6 +684,79 @@ class _PremiumEntryCard extends StatelessWidget {
       ),
     ),
   );
+}
+
+class _DashboardPremiumBanner extends StatelessWidget {
+  const _DashboardPremiumBanner({required this.state});
+
+  final FinanceState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final score = PremiumAnalytics.calculate(
+      accounts: state.accounts,
+      categories: state.categories,
+      transactions: state.transactions,
+      budgets: state.budgets,
+      contacts: state.contacts,
+      businessEntries: state.businessEntries,
+      isBusiness: state.isBusiness,
+    ).healthScore;
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => context.push('/premium'),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  SizedBox.square(
+                    dimension: 54,
+                    child: CircularProgressIndicator(
+                      value: score / 100,
+                      strokeWidth: 6,
+                      backgroundColor: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerHighest,
+                    ),
+                  ),
+                  Text(
+                    '$score',
+                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      state.bangla
+                          ? 'আপনার Financial Health Score'
+                          : 'Your Financial Health Score',
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      state.bangla
+                          ? 'Forecast ও smart recommendation দেখুন'
+                          : 'View forecasts and smart recommendations',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.arrow_forward_ios_rounded, size: 18),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _SummaryCard extends StatelessWidget {
@@ -1425,6 +1501,7 @@ Future<void> _showWorkspaceDialog(BuildContext context, WidgetRef ref) async {
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               initialValue: currencyCode,
+              isExpanded: true,
               decoration: const InputDecoration(labelText: 'Currency'),
               items: AppCurrency.supported
                   .map(
