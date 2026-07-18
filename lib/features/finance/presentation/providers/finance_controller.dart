@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../core/database/app_database.dart';
+import '../../../../services/backup_crypto_service.dart';
 import '../../../../services/security_service.dart';
 import '../../data/drift_finance_repository.dart';
 import '../../domain/finance_models.dart';
@@ -19,6 +20,10 @@ final financeRepositoryProvider = Provider<FinanceRepository>(
 
 final securityServiceProvider = Provider<SecurityService>(
   (ref) => SecurityService(),
+);
+
+final backupCryptoServiceProvider = Provider<BackupCryptoService>(
+  (ref) => BackupCryptoService(),
 );
 
 final financeControllerProvider =
@@ -386,6 +391,11 @@ class FinanceController extends Notifier<FinanceState> {
 
   Future<Map<String, Object?>> exportCurrentWorkspace() =>
       _repository.exportWorkspace(_requireWorkspace().id);
+
+  Future<void> importWorkspaceBackup(Map<String, Object?> backup) async {
+    await _repository.importWorkspace(backup);
+    await initialize();
+  }
 
   Future<void> syncNow() async {
     await _repository.markPendingAsSynced();

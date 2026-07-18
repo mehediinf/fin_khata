@@ -51,6 +51,16 @@ class SecurityService {
     }
   }
 
+  Future<bool> get canUseBiometrics async {
+    try {
+      if (!await _localAuthentication.isDeviceSupported()) return false;
+      final available = await _localAuthentication.getAvailableBiometrics();
+      return available.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> saveSelectedWorkspace(String id) =>
       _storage.write(key: 'selected_workspace', value: id);
 

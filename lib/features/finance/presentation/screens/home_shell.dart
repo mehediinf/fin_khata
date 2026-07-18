@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,6 +8,8 @@ import '../../../../core/constants/app_currencies.dart';
 import '../../../../core/localization/app_strings.dart';
 import '../../../onboarding/presentation/onboarding_screen.dart';
 import '../../../premium/domain/premium_analytics.dart';
+import '../../../security/presentation/providers/app_lock_controller.dart';
+import '../../../security/presentation/screens/pin_lock_screen.dart';
 import '../../domain/finance_models.dart';
 import '../providers/finance_controller.dart';
 
@@ -18,6 +18,13 @@ class HomeGate extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final lockState = ref.watch(appLockControllerProvider);
+    if (lockState.checking) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (lockState.locked) {
+      return const PinLockScreen();
+    }
     final state = ref.watch(financeControllerProvider);
     if (state.loading && state.workspaces.isEmpty) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -583,19 +590,35 @@ class MorePage extends ConsumerWidget {
                 value: state.darkMode,
                 onChanged: controller.setDarkMode,
               ),
-              ListTile(
-                leading: const Icon(Icons.lock_outline),
-                title: Text(
-                  t('PIN & biometric security', 'PIN ও biometric security'),
-                ),
-                subtitle: Text(
-                  t(
-                    'Tokens and PIN are kept in secure storage',
-                    'Token ও PIN secure storage-এ রাখা হয়',
-                  ),
-                ),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => _showPinDialog(context, ref),
+              Builder(
+                builder: (context) {
+                  final pinEnabled = ref.watch(
+                    appLockControllerProvider.select((s) => s.pinEnabled),
+                  );
+                  return ListTile(
+                    leading: const Icon(Icons.lock_outline),
+                    title: Text(
+                      t(
+                        'PIN & biometric security',
+                        'PIN ও biometric security',
+                      ),
+                    ),
+                    subtitle: Text(
+                      pinEnabled
+                          ? t(
+                              'App auto-locks in the background. Tap to change or remove PIN.',
+                              'App background-এ গেলে auto-lock হয়। PIN বদলাতে/সরাতে tap করুন।',
+                            )
+                          : t(
+                              'No app-lock PIN set yet',
+                              'এখনো app-lock PIN সেট করা হয়নি',
+                            ),
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () =>
+                        _showPinDialog(context, ref, pinEnabled: pinEnabled),
+                  );
+                },
               ),
               ListTile(
                 leading: const Icon(Icons.cloud_sync_outlined),
@@ -613,12 +636,24 @@ class MorePage extends ConsumerWidget {
                 title: Text(t('Backup workspace', 'Workspace backup')),
                 subtitle: Text(
                   t(
-                    'Schema-versioned JSON export',
-                    'Schema-version সহ JSON export',
+                    'Encrypted, passphrase-protected export',
+                    'Encrypted, passphrase-protected export',
                   ),
                 ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => _showBackup(context, ref),
+              ),
+              ListTile(
+                leading: const Icon(Icons.restore_outlined),
+                title: Text(t('Restore workspace', 'Workspace restore')),
+                subtitle: Text(
+                  t(
+                    'Import an encrypted backup',
+                    'Encrypted backup import করুন',
+                  ),
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _showRestoreDialog(context, ref),
               ),
             ],
           ),
@@ -1798,13 +1833,17 @@ Future<void> _showContactDialog(BuildContext context, WidgetRef ref) async {
   phone.dispose();
 }
 
-Future<void> _showPinDialog(BuildContext context, WidgetRef ref) async {
+Future<void> _showPinDialog(
+  BuildContext context,
+  WidgetRef ref, {
+  required bool pinEnabled,
+}) async {
   final pin = TextEditingController();
   await _showManagedDialog<void>(
     context: context,
     builder: (context) => AlertDialog(
       scrollable: true,
-      title: const Text('Set app PIN'),
+      title: Text(pinEnabled ? 'Change app PIN' : 'Set app PIN'),
       content: TextField(
         controller: pin,
         obscureText: true,
@@ -1813,6 +1852,24 @@ Future<void> _showPinDialog(BuildContext context, WidgetRef ref) async {
         decoration: const InputDecoration(labelText: '4–6 digit PIN'),
       ),
       actions: [
+        if (pinEnabled)
+          TextButton(
+            onPressed: () async {
+              try {
+                await ref.read(securityServiceProvider).removePin();
+                await ref
+                    .read(appLockControllerProvider.notifier)
+                    .refreshPinStatus();
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  _notice(context, 'App-lock PIN removed.');
+                }
+              } catch (error) {
+                if (context.mounted) _error(context, error);
+              }
+            },
+            child: const Text('Remove PIN'),
+          ),
         TextButton(
           onPressed: () => Navigator.pop(context),
           child: const Text('Cancel'),
@@ -1821,6 +1878,9 @@ Future<void> _showPinDialog(BuildContext context, WidgetRef ref) async {
           onPressed: () async {
             try {
               await ref.read(securityServiceProvider).setPin(pin.text);
+              await ref
+                  .read(appLockControllerProvider.notifier)
+                  .refreshPinStatus();
               if (context.mounted) {
                 Navigator.pop(context);
                 _notice(context, 'PIN saved securely.');
@@ -1838,44 +1898,243 @@ Future<void> _showPinDialog(BuildContext context, WidgetRef ref) async {
 }
 
 Future<void> _showBackup(BuildContext context, WidgetRef ref) async {
-  try {
-    final backup = await ref
-        .read(financeControllerProvider.notifier)
-        .exportCurrentWorkspace();
-    final text = const JsonEncoder.withIndent('  ').convert(backup);
-    if (!context.mounted) return;
-    await _showManagedDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Workspace backup'),
-        content: SizedBox(
-          width: 620,
-          child: SingleChildScrollView(
-            child: SelectableText(
-              text,
-              style: Theme.of(context).textTheme.bodySmall,
+  final passController = TextEditingController();
+  final confirmController = TextEditingController();
+  var busy = false;
+  String? errorText;
+
+  final envelope = await _showManagedDialog<String>(
+    context: context,
+    builder: (context) => StatefulBuilder(
+      builder: (context, setState) => AlertDialog(
+        scrollable: true,
+        title: const Text('Encrypt backup'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Choose a passphrase to encrypt this backup. If you lose it, '
+              'the backup cannot be restored.',
             ),
-          ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: passController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Passphrase (min 6 characters)',
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: confirmController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Confirm passphrase',
+              ),
+            ),
+            if (errorText != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                errorText!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ],
+          ],
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              Clipboard.setData(ClipboardData(text: text));
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text('Backup copied.')));
-            },
-            child: const Text('Copy JSON'),
+            onPressed: busy ? null : () => Navigator.pop(context),
+            child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Done'),
+            onPressed: busy
+                ? null
+                : () async {
+                    final pass = passController.text;
+                    if (pass.length < 6) {
+                      setState(
+                        () => errorText =
+                            'Passphrase must be at least 6 characters.',
+                      );
+                      return;
+                    }
+                    if (pass != confirmController.text) {
+                      setState(() => errorText = 'Passphrases do not match.');
+                      return;
+                    }
+                    setState(() {
+                      busy = true;
+                      errorText = null;
+                    });
+                    try {
+                      final backup = await ref
+                          .read(financeControllerProvider.notifier)
+                          .exportCurrentWorkspace();
+                      final encrypted = await ref
+                          .read(backupCryptoServiceProvider)
+                          .encryptJson(backup, pass);
+                      if (context.mounted) Navigator.pop(context, encrypted);
+                    } catch (error) {
+                      setState(() {
+                        busy = false;
+                        errorText = error.toString();
+                      });
+                    }
+                  },
+            child: busy
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2.2),
+                  )
+                : const Text('Encrypt & Continue'),
           ),
         ],
       ),
-    );
-  } catch (error) {
-    if (context.mounted) _error(context, error);
+    ),
+  );
+  passController.dispose();
+  confirmController.dispose();
+  if (envelope == null || !context.mounted) return;
+
+  await _showManagedDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Encrypted workspace backup'),
+      content: SizedBox(
+        width: 620,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Save this somewhere safe. Without the passphrase, it cannot '
+                'be restored.',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: Colors.red),
+              ),
+              const SizedBox(height: 12),
+              SelectableText(
+                envelope,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            Clipboard.setData(ClipboardData(text: envelope));
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Encrypted backup copied.')),
+            );
+          },
+          child: const Text('Copy'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Done'),
+        ),
+      ],
+    ),
+  );
+}
+
+Future<void> _showRestoreDialog(BuildContext context, WidgetRef ref) async {
+  final envelopeController = TextEditingController();
+  final passController = TextEditingController();
+  var busy = false;
+  String? errorText;
+
+  final imported = await _showManagedDialog<bool>(
+    context: context,
+    builder: (context) => StatefulBuilder(
+      builder: (context, setState) => AlertDialog(
+        scrollable: true,
+        title: const Text('Restore workspace'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: envelopeController,
+              maxLines: 6,
+              decoration: const InputDecoration(
+                labelText: 'Encrypted backup text',
+                alignLabelWithHint: true,
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: passController,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'Passphrase'),
+            ),
+            if (errorText != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                errorText!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: busy ? null : () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: busy
+                ? null
+                : () async {
+                    final envelopeText = envelopeController.text.trim();
+                    if (envelopeText.isEmpty || passController.text.isEmpty) {
+                      setState(
+                        () => errorText =
+                            'Paste the backup text and enter its passphrase.',
+                      );
+                      return;
+                    }
+                    setState(() {
+                      busy = true;
+                      errorText = null;
+                    });
+                    try {
+                      final backup = await ref
+                          .read(backupCryptoServiceProvider)
+                          .decryptJson(envelopeText, passController.text);
+                      await ref
+                          .read(financeControllerProvider.notifier)
+                          .importWorkspaceBackup(backup);
+                      if (context.mounted) Navigator.pop(context, true);
+                    } catch (error) {
+                      setState(() {
+                        busy = false;
+                        errorText = error.toString();
+                      });
+                    }
+                  },
+            child: busy
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2.2),
+                  )
+                : const Text('Decrypt & Restore'),
+          ),
+        ],
+      ),
+    ),
+  );
+  envelopeController.dispose();
+  passController.dispose();
+  if (imported == true && context.mounted) {
+    _notice(context, 'Workspace restored.');
   }
 }
 
