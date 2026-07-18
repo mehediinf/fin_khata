@@ -1,4 +1,4 @@
-package com.example.fin_khata
+package com.arivon.fin_khata
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 
