@@ -115,4 +115,32 @@ void main() {
       throwsA(isA<FinanceValidationException>()),
     );
   });
+
+  test(
+    'importWorkspace upserts an already-existing row instead of ignoring it',
+    () async {
+      final backup = await repository.exportWorkspace('workspace');
+      final tables = Map<String, Object?>.from(
+        backup['tables']! as Map,
+      );
+      final accounts = (tables['accounts'] as List)
+          .cast<Map>()
+          .map(Map<String, Object?>.from)
+          .toList();
+      final cashRow = accounts.firstWhere((row) => row['id'] == 'cash');
+      // Simulate a remote edit: the same account id, renamed and with a
+      // different balance — as if another device changed it before pushing.
+      cashRow['name'] = 'Cash (renamed remotely)';
+      cashRow['current_balance'] = 9999.0;
+      tables['accounts'] = accounts;
+      final modifiedBackup = {...backup, 'tables': tables};
+
+      await repository.importWorkspace(modifiedBackup);
+
+      final updated = await repository.accounts('workspace');
+      final cash = updated.firstWhere((item) => item.id == 'cash');
+      expect(cash.name, 'Cash (renamed remotely)');
+      expect(cash.currentBalance, 9999.0);
+    },
+  );
 }

@@ -66,4 +66,54 @@ class SecurityService {
 
   Future<String?> selectedWorkspace() =>
       _storage.read(key: 'selected_workspace');
+
+  Future<void> saveTokens({
+    required String accessToken,
+    required String refreshToken,
+    required DateTime accessExpiresAt,
+    required String email,
+  }) async {
+    await _storage.write(key: 'auth_access_token', value: accessToken);
+    await _storage.write(key: 'auth_refresh_token', value: refreshToken);
+    await _storage.write(
+      key: 'auth_access_expires_at',
+      value: accessExpiresAt.toIso8601String(),
+    );
+    await _storage.write(key: 'auth_email', value: email);
+    await _storage.write(key: 'cloud_sync_enabled', value: 'true');
+  }
+
+  Future<String?> readAccessToken() => _storage.read(key: 'auth_access_token');
+
+  Future<String?> readRefreshToken() =>
+      _storage.read(key: 'auth_refresh_token');
+
+  Future<DateTime?> readAccessExpiresAt() async {
+    final value = await _storage.read(key: 'auth_access_expires_at');
+    return value == null ? null : DateTime.tryParse(value);
+  }
+
+  Future<String?> readAuthEmail() => _storage.read(key: 'auth_email');
+
+  Future<void> clearTokens() async {
+    await _storage.delete(key: 'auth_access_token');
+    await _storage.delete(key: 'auth_refresh_token');
+    await _storage.delete(key: 'auth_access_expires_at');
+    await _storage.delete(key: 'auth_email');
+    await _storage.delete(key: 'cloud_sync_enabled');
+  }
+
+  Future<bool> get cloudSyncEnabled async =>
+      (await _storage.read(key: 'cloud_sync_enabled')) == 'true';
+
+  Future<void> saveSyncBaseVersion(String workspaceId, int version) =>
+      _storage.write(
+        key: 'sync_base_version_$workspaceId',
+        value: version.toString(),
+      );
+
+  Future<int> syncBaseVersion(String workspaceId) async {
+    final value = await _storage.read(key: 'sync_base_version_$workspaceId');
+    return value == null ? 0 : int.tryParse(value) ?? 0;
+  }
 }

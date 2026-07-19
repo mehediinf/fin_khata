@@ -50,19 +50,18 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyCSTdaBtoP1wGGxxciRzmBdwFc44wja9g0',
-    appId: '1:770826916376:android:955c2b46af392780a8a96d',
-    messagingSenderId: '770826916376',
-    projectId: 'fin-khata-app',
-    storageBucket: 'fin-khata-app.firebasestorage.app',
+    apiKey: 'AIzaSyDGFlS9-sEHXylFu1Yxa6N2-9wNmCiJgik',
+    appId: '1:1017286601732:android:ce3e3291b80f74fa771951',
+    messagingSenderId: '1017286601732',
+    projectId: 'finkhata-6c3ee',
+    storageBucket: 'finkhata-6c3ee.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyB_tehwr4Gf_zRirYTiResKotZ1N6sjLqk',
-    appId: '1:770826916376:ios:6b01546976ba51e9a8a96d',
-    messagingSenderId: '770826916376',
-    projectId: 'fin-khata-app',
-    storageBucket: 'fin-khata-app.firebasestorage.app',
+    apiKey: 'AIzaSyByMHYXn9VeVKBvbQoOaw-SRxG6ZTsU4sE',
+    appId: '1:1017286601732:ios:a7148d3021c436be771951',
+    messagingSenderId: '1017286601732',
+    projectId: 'finkhata-6c3ee',
+    storageBucket: 'finkhata-6c3ee.firebasestorage.app',
     iosBundleId: 'com.arivon.finKhata',
   );
 }

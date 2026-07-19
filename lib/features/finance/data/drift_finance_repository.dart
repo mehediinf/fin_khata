@@ -622,8 +622,17 @@ class DriftFinanceRepository implements FinanceRepository {
           final row = Map<String, Object?>.from(untyped);
           final columns = row.keys.toList();
           final placeholders = List.filled(columns.length, '?').join(',');
+          // Upsert (not INSERT OR IGNORE): a pull-from-server must overwrite
+          // an already-existing local row, not silently skip it.
+          final updateAssignments = columns
+              .where((column) => column != 'id')
+              .map((column) => '$column=excluded.$column')
+              .join(',');
+          final conflictClause = updateAssignments.isEmpty
+              ? 'ON CONFLICT(id) DO NOTHING'
+              : 'ON CONFLICT(id) DO UPDATE SET $updateAssignments';
           await database.customStatement(
-            'INSERT OR IGNORE INTO ${entry.key} (${columns.join(',')}) VALUES ($placeholders)',
+            'INSERT INTO ${entry.key} (${columns.join(',')}) VALUES ($placeholders) $conflictClause',
             columns.map((column) => row[column]).toList(),
           );
         }

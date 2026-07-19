@@ -3,17 +3,17 @@
 <plist version="1.0">
 <dict>
 	<key>API_KEY</key>
-	<string>AIzaSyB_tehwr4Gf_zRirYTiResKotZ1N6sjLqk</string>
+	<string>AIzaSyByMHYXn9VeVKBvbQoOaw-SRxG6ZTsU4sE</string>
 	<key>GCM_SENDER_ID</key>
-	<string>770826916376</string>
+	<string>1017286601732</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
 	<string>com.arivon.finKhata</string>
 	<key>PROJECT_ID</key>
-	<string>fin-khata-app</string>
+	<string>finkhata-6c3ee</string>
 	<key>STORAGE_BUCKET</key>
-	<string>fin-khata-app.firebasestorage.app</string>
+	<string>finkhata-6c3ee.firebasestorage.app</string>
 	<key>IS_ADS_ENABLED</key>
 	<false></false>
 	<key>IS_ANALYTICS_ENABLED</key>
@@ -25,6 +25,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:770826916376:ios:6b01546976ba51e9a8a96d</string>
+	<string>1:1017286601732:ios:a7148d3021c436be771951</string>
 </dict>
 </plist>

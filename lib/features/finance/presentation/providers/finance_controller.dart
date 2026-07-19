@@ -4,6 +4,8 @@ import 'package:uuid/uuid.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../services/backup_crypto_service.dart';
 import '../../../../services/security_service.dart';
+import '../../../../services/sync_api_client.dart';
+import '../../../auth/presentation/providers/auth_controller.dart';
 import '../../data/drift_finance_repository.dart';
 import '../../domain/finance_models.dart';
 import '../../domain/finance_repository.dart';
@@ -24,6 +26,10 @@ final securityServiceProvider = Provider<SecurityService>(
 
 final backupCryptoServiceProvider = Provider<BackupCryptoService>(
   (ref) => BackupCryptoService(),
+);
+
+final syncApiClientProvider = Provider<SyncApiClient>(
+  (ref) => HttpSyncApiClient(),
 );
 
 final financeControllerProvider =
@@ -397,9 +403,37 @@ class FinanceController extends Notifier<FinanceState> {
     await initialize();
   }
 
-  Future<void> syncNow() async {
+  /// Pushes the current workspace to the cloud sync server, then pulls the
+  /// authoritative copy back down. Returns true if the server reports this
+  /// push overwrote a newer copy from another device (still applied, per
+  /// last-write-wins — just surfaced so the UI can show a soft notice).
+  /// Throws [FinanceValidationException] if cloud sync isn't logged in.
+  Future<bool> syncNow() async {
+    final workspace = _requireWorkspace();
+    final accessToken = await ref
+        .read(authControllerProvider.notifier)
+        .ensureValidAccessToken();
+    if (accessToken == null) {
+      throw const FinanceValidationException('Log in to cloud sync first.');
+    }
+
+    final syncApi = ref.read(syncApiClientProvider);
+    final baseVersion = await _security.syncBaseVersion(workspace.id);
+    final export = await _repository.exportWorkspace(workspace.id);
+    final pushResult = await syncApi.push(
+      accessToken,
+      workspace.id,
+      baseVersion: baseVersion,
+      snapshot: export,
+    );
+
+    final pulled = await syncApi.pull(accessToken, workspace.id);
+    await _repository.importWorkspace(pulled.snapshot);
+    await _security.saveSyncBaseVersion(workspace.id, pulled.versionCounter);
     await _repository.markPendingAsSynced();
     await refresh();
+
+    return pushResult.conflict;
   }
 
   void setBangla(bool value) => state = state.copyWith(bangla: value);

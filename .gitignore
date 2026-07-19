@@ -43,3 +43,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# FinKhata cloud sync backend
+/server/node_modules/
+/server/.env
+/server/firebase-debug.log

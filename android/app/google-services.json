@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "770826916376",
-    "project_id": "fin-khata-app",
-    "storage_bucket": "fin-khata-app.firebasestorage.app"
+    "project_number": "1017286601732",
+    "project_id": "finkhata-6c3ee",
+    "storage_bucket": "finkhata-6c3ee.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:770826916376:android:955c2b46af392780a8a96d",
+        "mobilesdk_app_id": "1:1017286601732:android:ce3e3291b80f74fa771951",
         "android_client_info": {
           "package_name": "com.arivon.fin_khata"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyCSTdaBtoP1wGGxxciRzmBdwFc44wja9g0"
+          "current_key": "AIzaSyDGFlS9-sEHXylFu1Yxa6N2-9wNmCiJgik"
         }
       ],
       "services": {

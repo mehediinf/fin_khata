@@ -6,6 +6,8 @@ import 'package:intl/intl.dart';
 
 import '../../../../core/constants/app_currencies.dart';
 import '../../../../core/localization/app_strings.dart';
+import '../../../auth/presentation/providers/auth_controller.dart';
+import '../../../auth/presentation/screens/auth_screen.dart';
 import '../../../onboarding/presentation/onboarding_screen.dart';
 import '../../../premium/domain/premium_analytics.dart';
 import '../../../security/presentation/providers/app_lock_controller.dart';
@@ -24,6 +26,13 @@ class HomeGate extends ConsumerWidget {
     }
     if (lockState.locked) {
       return const PinLockScreen();
+    }
+    final authState = ref.watch(authControllerProvider);
+    if (authState.checking) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (authState.needsReauth) {
+      return const AuthScreen(forcedReauth: true);
     }
     final state = ref.watch(financeControllerProvider);
     if (state.loading && state.workspaces.isEmpty) {
@@ -620,16 +629,50 @@ class MorePage extends ConsumerWidget {
                   );
                 },
               ),
-              ListTile(
-                leading: const Icon(Icons.cloud_sync_outlined),
-                title: Text(t('Offline sync queue', 'Offline sync queue')),
-                subtitle: Text(
-                  '${state.pendingSync} ${t('pending changes', 'টি pending change')}',
-                ),
-                trailing: TextButton(
-                  onPressed: state.pendingSync == 0 ? null : controller.syncNow,
-                  child: Text(t('Sync', 'Sync')),
-                ),
+              Builder(
+                builder: (context) {
+                  final authState = ref.watch(authControllerProvider);
+                  return ListTile(
+                    leading: const Icon(Icons.cloud_sync_outlined),
+                    title: Text(t('Cloud sync', 'Cloud sync')),
+                    subtitle: Text(
+                      authState.loggedIn
+                          ? '${authState.userEmail} • ${state.pendingSync} '
+                                '${t('pending changes', 'টি pending change')}'
+                          : t(
+                              'Log in to sync this workspace across devices',
+                              'Device-এর মধ্যে sync করতে login করুন',
+                            ),
+                    ),
+                    trailing: authState.loggedIn
+                        ? TextButton(
+                            onPressed: () async {
+                              try {
+                                final conflict = await controller.syncNow();
+                                if (!context.mounted) return;
+                                _notice(
+                                  context,
+                                  conflict
+                                      ? 'Synced — a newer copy from another '
+                                            'device was found and applied.'
+                                      : 'Synced successfully.',
+                                );
+                              } catch (error) {
+                                if (context.mounted) _error(context, error);
+                              }
+                            },
+                            child: Text(t('Sync', 'Sync')),
+                          )
+                        : const Icon(Icons.chevron_right),
+                    onTap: authState.loggedIn
+                        ? () => _showLogoutDialog(context, ref)
+                        : () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const AuthScreen(),
+                            ),
+                          ),
+                  );
+                },
               ),
               ListTile(
                 leading: const Icon(Icons.backup_outlined),
@@ -1895,6 +1938,33 @@ Future<void> _showPinDialog(
     ),
   );
   pin.dispose();
+}
+
+Future<void> _showLogoutDialog(BuildContext context, WidgetRef ref) async {
+  final confirmed = await _showManagedDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Log out of cloud sync?'),
+      content: const Text(
+        'This device will stop syncing until you log in again. Your local '
+        'data is not affected.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('Log out'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed == true) {
+    await ref.read(authControllerProvider.notifier).logout();
+    if (context.mounted) _notice(context, 'Logged out of cloud sync.');
+  }
 }
 
 Future<void> _showBackup(BuildContext context, WidgetRef ref) async {
